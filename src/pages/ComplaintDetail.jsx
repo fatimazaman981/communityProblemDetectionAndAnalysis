@@ -2,9 +2,19 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTheme } from '../context/ThemeContext'
 import { STATUSES, PRIORITIES, STATUS_COLOR_MAP, PRIORITY_COLOR_MAP } from '../constants'
-import { ALL_COMPLAINTS, COMPLAINT_DETAILS } from '../data/mockData'
+import { ALL_COMPLAINTS, COMPLAINT_DETAILS, LABOR_WORKERS, LABOR_SKILLS } from '../data/mockData'
 import Card from '../components/Card'
 import Badge from '../components/Badge'
+
+// Maps complaint category → most relevant labor skill for the default suggestion
+const CATEGORY_TO_SKILL = {
+  'Water Supply': 'Plumber',
+  'Electricity':  'Electrician',
+  'Sanitation':   'General Labor',
+  'Security':     'General Labor',
+  'Road Damage':  'General Labor',
+  'Other':        'General Labor',
+}
 
 // ─── Helpers (no C dependency) ────────────────────────────────
 
@@ -218,6 +228,18 @@ export default function ComplaintDetail() {
   const [noteInput, setNoteInput]             = useState('')
   const [savedFlash, setSavedFlash]           = useState(false)
 
+  // Labor assignment state
+  const suggestedSkill = CATEGORY_TO_SKILL[base?.category] ?? 'General Labor'
+  const [laborSkill, setLaborSkill]         = useState(suggestedSkill)
+  const [selectedWorkerId, setSelectedWorkerId] = useState('')
+  const [assignedWorker, setAssignedWorker] = useState(null)
+  const [assignFlash, setAssignFlash]       = useState(false)
+
+  // Workers filtered by chosen skill who are currently available
+  const availableForSkill = LABOR_WORKERS.filter(
+    w => w.skill === laborSkill && w.available
+  )
+
   useEffect(() => {
     if (!base || !detail) return
     setStatus(base.status)
@@ -227,6 +249,12 @@ export default function ComplaintDetail() {
     setTimeline(detail.timeline)
     setNoteInput('')
     setSavedFlash(false)
+    // Reset labor assignment when navigating to a new complaint
+    const skill = CATEGORY_TO_SKILL[base.category] ?? 'General Labor'
+    setLaborSkill(skill)
+    setSelectedWorkerId('')
+    setAssignedWorker(null)
+    setAssignFlash(false)
   }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!base || !detail) {
@@ -272,6 +300,25 @@ export default function ComplaintDetail() {
       { type: 'note', text: noteInput.trim(), at: fmtNow(), by: 'Admin' },
     ])
     setNoteInput('')
+  }
+
+  function handleAssignLabor() {
+    if (!selectedWorkerId) return
+    const worker = LABOR_WORKERS.find(w => w.id === selectedWorkerId)
+    if (!worker) return
+    setAssignedWorker(worker)
+    // Add a timeline entry so the assignment is part of the audit trail
+    setTimeline(prev => [
+      ...prev,
+      {
+        type: 'note',
+        text: `Labor assigned — ${worker.name} (${worker.skill}) · ${worker.phone}`,
+        at: fmtNow(),
+        by: 'Admin',
+      },
+    ])
+    setAssignFlash(true)
+    setTimeout(() => setAssignFlash(false), 2500)
   }
 
   const scoreColor = fakeScoreColor(detail.ai.fakeScore, C)
@@ -527,6 +574,196 @@ export default function ComplaintDetail() {
                 ))}
               </div>
             </div>
+          </Card>
+
+          {/* ── Assign Labor Card ── */}
+          <Card>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Assign Labor</div>
+              <span style={{
+                fontSize: 9, fontWeight: 700, letterSpacing: 0.6,
+                color: C.teal, background: `${C.teal}20`,
+                border: `1px solid ${C.teal}44`,
+                borderRadius: 100, padding: '2px 8px',
+              }}>
+                WORKER DISPATCH
+              </span>
+            </div>
+
+            {/* If a worker is already assigned, show their contact card */}
+            {assignedWorker ? (
+              <div style={{
+                background: `${C.green}10`,
+                border: `1px solid ${C.green}33`,
+                borderRadius: 12, padding: '14px 16px',
+                display: 'flex', flexDirection: 'column', gap: 12,
+              }}>
+                {/* Success header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                  </svg>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: C.green }}>
+                    {assignFlash ? 'Worker Assigned!' : 'Assigned Worker'}
+                  </span>
+                </div>
+
+                {/* Worker info */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: '50%',
+                    background: `${C.teal}20`, border: `1.5px solid ${C.teal}44`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
+                  }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                    </svg>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{assignedWorker.name}</div>
+                    <div style={{ fontSize: 11, color: C.textMuted, marginTop: 1 }}>
+                      {assignedWorker.skill} · {assignedWorker.experience}
+                    </div>
+                  </div>
+                  <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                    <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 2 }}>Rating</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.amber }}>{assignedWorker.rating} ★</div>
+                  </div>
+                </div>
+
+                {/* Contact info — this is what the resident sees */}
+                <div style={{
+                  background: C.surfaceHigh,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 8, padding: '10px 14px',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+                  </svg>
+                  <div>
+                    <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                      Contact (Shared with Resident)
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginTop: 2 }}>
+                      {assignedWorker.phone}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Re-assign button */}
+                <button
+                  onClick={() => { setAssignedWorker(null); setSelectedWorkerId('') }}
+                  style={{
+                    background: 'transparent',
+                    border: `1px solid ${C.border}`,
+                    color: C.textMuted,
+                    fontFamily: 'Outfit', fontSize: 12, fontWeight: 600,
+                    padding: '7px', borderRadius: 8,
+                    cursor: 'pointer', width: '100%',
+                  }}
+                >
+                  Re-assign Worker
+                </button>
+              </div>
+            ) : (
+              /* Assignment form — skill picker → worker picker → assign button */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+                {/* Skill dropdown */}
+                <div>
+                  <SectionLabel>Skill Required</SectionLabel>
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      value={laborSkill}
+                      onChange={e => { setLaborSkill(e.target.value); setSelectedWorkerId('') }}
+                      style={{
+                        ...SELECT_STYLE, width: '100%',
+                        borderColor: `${C.teal}44`,
+                      }}
+                    >
+                      {LABOR_SKILLS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <ChevronDown />
+                  </div>
+                </div>
+
+                {/* Worker dropdown — only shows available workers for selected skill */}
+                <div>
+                  <SectionLabel>
+                    Available Workers
+                    <span style={{ color: availableForSkill.length > 0 ? C.green : C.red, marginLeft: 6, fontWeight: 700 }}>
+                      ({availableForSkill.length})
+                    </span>
+                  </SectionLabel>
+                  {availableForSkill.length === 0 ? (
+                    <div style={{
+                      background: `${C.red}10`, border: `1px solid ${C.red}22`,
+                      borderRadius: 8, padding: '10px 12px',
+                      fontSize: 12, color: C.red,
+                    }}>
+                      No {laborSkill}s available right now
+                    </div>
+                  ) : (
+                    <div style={{ position: 'relative' }}>
+                      <select
+                        value={selectedWorkerId}
+                        onChange={e => setSelectedWorkerId(e.target.value)}
+                        style={{ ...SELECT_STYLE, width: '100%' }}
+                      >
+                        <option value="">Select worker…</option>
+                        {availableForSkill.map(w => (
+                          <option key={w.id} value={w.id}>
+                            {w.name} · ★{w.rating} · {w.experience}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown />
+                    </div>
+                  )}
+                </div>
+
+                {/* Show selected worker preview */}
+                {selectedWorkerId && (() => {
+                  const w = LABOR_WORKERS.find(x => x.id === selectedWorkerId)
+                  return w ? (
+                    <div style={{
+                      background: C.surfaceHigh, border: `1px solid ${C.border}`,
+                      borderRadius: 8, padding: '10px 12px',
+                      display: 'flex', alignItems: 'center', gap: 10,
+                    }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={C.textMuted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+                      </svg>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{w.phone}</span>
+                    </div>
+                  ) : null
+                })()}
+
+                {/* Assign button */}
+                <button
+                  onClick={handleAssignLabor}
+                  disabled={!selectedWorkerId}
+                  style={{
+                    background: selectedWorkerId ? C.teal : 'transparent',
+                    border: `1px solid ${selectedWorkerId ? C.teal : C.border}`,
+                    color: selectedWorkerId ? '#fff' : C.textMuted,
+                    fontFamily: 'Outfit', fontSize: 13, fontWeight: 700,
+                    padding: '10px', borderRadius: 8,
+                    cursor: selectedWorkerId ? 'pointer' : 'default',
+                    transition: 'all 0.2s',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                  </svg>
+                  Assign Worker
+                </button>
+              </div>
+            )}
           </Card>
 
           {/* ── Activity Timeline Card ── */}

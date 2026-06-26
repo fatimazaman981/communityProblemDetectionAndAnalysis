@@ -10,6 +10,9 @@ import Analytics from './pages/Analytics'
 import UrgentAlerts from './pages/Alerts'
 import Sentiment from './pages/Sentiment'
 import FakeDetection from './pages/FakeDetection'
+import Users from './pages/Users'
+import Reports from './pages/Reports'
+import LaborManagement from './pages/LaborManagement'
 
 function Placeholder({ title }) {
   const { colors: C } = useTheme()
@@ -36,8 +39,9 @@ export default function App() {
             <Route path="sentiment" element={<Sentiment />} />
             <Route path="fake-detection" element={<FakeDetection />} />
             <Route path="duplicates" element={<Placeholder title="Duplicate Detection" />} />
-            <Route path="users" element={<Placeholder title="User Management" />} />
-            <Route path="reports" element={<Placeholder title="Reports" />} />
+            <Route path="users" element={<Users />} />
+            <Route path="reports" element={<Reports />} />
+            <Route path="labor" element={<LaborManagement />} />
           </Route>
         </Routes>
       </BrowserRouter>

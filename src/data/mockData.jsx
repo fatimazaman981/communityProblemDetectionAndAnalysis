@@ -628,6 +628,97 @@ export const FEEDBACK_FEED = [
   { id: 8, resident: 'Asad Iqbal',     block: 'Block D', comment: 'Submitted a power outage complaint two days ago but have not received any acknowledgement yet.', sentiment: 'Neutral',  date: 'Jun 20, 2026' },
 ]
 
+export const MOCK_USERS = [
+  { id: 'U-001', name: 'Aasma Iqbal',      block: 'Block A', unit: 'A-07', phone: '+92 300 1234567', complaintsCount: 8,  status: 'Active' },
+  { id: 'U-002', name: 'Fatima Zaman',     block: 'Block C', unit: 'C-07', phone: '+92 333 9876543', complaintsCount: 5,  status: 'Active' },
+  { id: 'U-003', name: 'Ali Hassan',       block: 'Block B', unit: 'B-03', phone: '+92 321 5551234', complaintsCount: 3,  status: 'Active' },
+  { id: 'U-004', name: 'Sara Khan',        block: 'Block A', unit: 'A-05', phone: '+92 311 7654321', complaintsCount: 6,  status: 'Active' },
+  { id: 'U-005', name: 'Ahmed Raza',       block: 'Block E', unit: 'E-09', phone: '+92 345 1122334', complaintsCount: 2,  status: 'Active' },
+  { id: 'U-006', name: 'Kinza Awan',       block: 'Block D', unit: 'D-11', phone: '+92 300 5678901', complaintsCount: 4,  status: 'Active' },
+  { id: 'U-007', name: 'Umar Farooq',      block: 'Block C', unit: 'C-14', phone: '+92 312 3344556', complaintsCount: 1,  status: 'Active' },
+  { id: 'U-008', name: 'Bilal Ahmed',      block: 'Block A', unit: 'A-02', phone: '+92 322 6677889', complaintsCount: 7,  status: 'Active' },
+  { id: 'U-009', name: 'Nadia Malik',      block: 'Block B', unit: 'B-08', phone: '+92 334 9900112', complaintsCount: 3,  status: 'Active' },
+  { id: 'U-010', name: 'Ayesha Tariq',     block: 'Block D', unit: 'D-04', phone: '+92 344 2233445', complaintsCount: 2,  status: 'Active' },
+  { id: 'U-011', name: 'Rashid Mehmood',   block: 'Block B', unit: 'B-12', phone: '+92 302 5566778', complaintsCount: 4,  status: 'Banned' },
+  { id: 'U-012', name: 'Zahid Ali',        block: 'Block C', unit: 'C-03', phone: '+92 315 8899001', complaintsCount: 2,  status: 'Active' },
+  { id: 'U-013', name: 'Sana Butt',        block: 'Block A', unit: 'A-10', phone: '+92 321 1122334', complaintsCount: 5,  status: 'Active' },
+  { id: 'U-014', name: 'Tariq Javed',      block: 'Block E', unit: 'E-06', phone: '+92 343 4455667', complaintsCount: 3,  status: 'Active' },
+  { id: 'U-015', name: 'Hina Qureshi',     block: 'Block D', unit: 'D-09', phone: '+92 301 7788990', complaintsCount: 1,  status: 'Active' },
+  { id: 'U-016', name: 'Omar Khalid',      block: 'Block C', unit: 'C-11', phone: '+92 333 0011223', complaintsCount: 3,  status: 'Active' },
+  { id: 'U-017', name: 'Zara Hussain',     block: 'Block B', unit: 'B-06', phone: '+92 323 3344556', complaintsCount: 6,  status: 'Active' },
+  { id: 'U-018', name: 'Kamran Sheikh',    block: 'Block A', unit: 'A-01', phone: '+92 312 6677889', complaintsCount: 4,  status: 'Active' },
+  { id: 'U-019', name: 'Mehwish Siddiqui', block: 'Block E', unit: 'E-13', phone: '+92 344 9900112', complaintsCount: 2,  status: 'Banned' },
+  { id: 'U-020', name: 'Asad Iqbal',       block: 'Block D', unit: 'D-02', phone: '+92 302 2233445', complaintsCount: 3,  status: 'Active' },
+  { id: 'U-021', name: 'Taha Raza',        block: 'Block C', unit: 'C-08', phone: '+92 315 5566778', complaintsCount: 2,  status: 'Active' },
+  { id: 'U-022', name: 'Laiba Farooq',     block: 'Block A', unit: 'A-15', phone: '+92 321 8899001', complaintsCount: 1,  status: 'Active' },
+  { id: 'U-023', name: 'Waleed Khan',      block: 'Block B', unit: 'B-09', phone: '+92 343 1122334', complaintsCount: 5,  status: 'Banned' },
+  { id: 'U-024', name: 'Rida Ahmed',       block: 'Block E', unit: 'E-02', phone: '+92 301 4455667', complaintsCount: 2,  status: 'Active' },
+  { id: 'U-025', name: 'Sadia Nawaz',      block: 'Block D', unit: 'D-07', phone: '+92 333 7788990', complaintsCount: 1,  status: 'Active' },
+]
+
+export const REPORT_PREVIEW = {
+  'Complaint Summary': [
+    { id: 'C-1042', title: 'Water supply cut off for 72 hours in Block A',          block: 'Block A', category: 'Water Supply', status: 'In Progress', date: 'Jun 26, 2026' },
+    { id: 'C-1041', title: 'Recurring power outages across all floors in Block C',  block: 'Block C', category: 'Electricity',  status: 'Pending',     date: 'Jun 26, 2026' },
+    { id: 'C-1040', title: 'Garbage collection skipped for one week in Block B',    block: 'Block B', category: 'Sanitation',   status: 'Resolved',    date: 'Jun 25, 2026' },
+    { id: 'C-1039', title: 'Boundary wall breach — unauthorized entry detected',    block: 'Block A', category: 'Security',     status: 'Pending',     date: 'Jun 25, 2026' },
+    { id: 'C-1038', title: 'Deep potholes on service road causing vehicle damage',  block: 'Block E', category: 'Road Damage',  status: 'Resolved',    date: 'Jun 25, 2026' },
+    { id: 'C-1037', title: 'Low water pressure on upper floors in Block D',         block: 'Block D', category: 'Water Supply', status: 'In Progress', date: 'Jun 24, 2026' },
+    { id: 'C-1036', title: 'Malfunctioning streetlights near Block C main gate',   block: 'Block C', category: 'Other',        status: 'Pending',     date: 'Jun 24, 2026' },
+    { id: 'C-1035', title: 'MCB tripping repeatedly — electricity fault in Block A', block: 'Block A', category: 'Electricity', status: 'Pending',     date: 'Jun 24, 2026' },
+  ],
+  'Resolution Rate': [
+    { block: 'Block A', total: 110, resolved: 88, pending: 22, rate: '80%' },
+    { block: 'Block B', total:  84, resolved: 65, pending: 19, rate: '77%' },
+    { block: 'Block C', total: 112, resolved: 90, pending: 22, rate: '80%' },
+    { block: 'Block D', total:  76, resolved: 62, pending: 14, rate: '82%' },
+    { block: 'Block E', total: 105, resolved: 78, pending: 27, rate: '74%' },
+  ],
+  'Pending Only': [
+    { id: 'C-1041', title: 'Recurring power outages across all floors in Block C',      block: 'Block C', category: 'Electricity',  status: 'Pending', date: 'Jun 26, 2026' },
+    { id: 'C-1039', title: 'Boundary wall breach — unauthorized entry detected',        block: 'Block A', category: 'Security',     status: 'Pending', date: 'Jun 25, 2026' },
+    { id: 'C-1036', title: 'Malfunctioning streetlights near Block C main gate',       block: 'Block C', category: 'Other',        status: 'Pending', date: 'Jun 24, 2026' },
+    { id: 'C-1035', title: 'MCB tripping repeatedly — electricity fault in Block A',   block: 'Block A', category: 'Electricity',  status: 'Pending', date: 'Jun 24, 2026' },
+    { id: 'C-1031', title: 'Pothole waterlogging causing road closure in Block C',     block: 'Block C', category: 'Road Damage',  status: 'Pending', date: 'Jun 22, 2026' },
+    { id: 'C-1028', title: 'Damaged community notice board in Block D hall',           block: 'Block D', category: 'Other',        status: 'Pending', date: 'Jun 21, 2026' },
+    { id: 'C-1026', title: 'Water pressure critically low — booster failure in Block B', block: 'Block B', category: 'Water Supply', status: 'Pending', date: 'Jun 21, 2026' },
+    { id: 'C-1023', title: 'Electricity meter malfunction causing overbilling issue',  block: 'Block D', category: 'Electricity',  status: 'Pending', date: 'Jun 20, 2026' },
+  ],
+}
+
+// ─── Labor / Workers Data ─────────────────────────────────────────────────────
+
+export const LABOR_SKILLS = [
+  'Plumber',
+  'Electrician',
+  'Carpenter',
+  'Painter',
+  'AC Technician',
+  'Gas Technician',
+  'Pest Control',
+  'General Labor',
+]
+
+export const LABOR_WORKERS = [
+  { id: 'L-001', name: 'Muhammad Waseem',  skill: 'Plumber',       phone: '+92 300 1112233', available: true,  rating: 4.8, jobsDone: 142, experience: '8 yrs' },
+  { id: 'L-002', name: 'Arshad Ali',       skill: 'Plumber',       phone: '+92 311 4455667', available: false, rating: 4.5, jobsDone:  98, experience: '5 yrs' },
+  { id: 'L-003', name: 'Tariq Mehmood',    skill: 'Plumber',       phone: '+92 321 7788990', available: true,  rating: 4.3, jobsDone:  76, experience: '4 yrs' },
+  { id: 'L-004', name: 'Zubair Hussain',   skill: 'Electrician',   phone: '+92 333 2233445', available: true,  rating: 4.9, jobsDone: 215, experience: '12 yrs' },
+  { id: 'L-005', name: 'Kamran Baig',      skill: 'Electrician',   phone: '+92 345 5566778', available: true,  rating: 4.6, jobsDone: 130, experience: '7 yrs' },
+  { id: 'L-006', name: 'Nadeem Akhtar',    skill: 'Electrician',   phone: '+92 302 8899001', available: false, rating: 4.4, jobsDone:  89, experience: '6 yrs' },
+  { id: 'L-007', name: 'Rashid Carpenter', skill: 'Carpenter',     phone: '+92 315 1122334', available: true,  rating: 4.7, jobsDone: 104, experience: '9 yrs' },
+  { id: 'L-008', name: 'Faisal Woodcraft', skill: 'Carpenter',     phone: '+92 343 4455667', available: true,  rating: 4.2, jobsDone:  58, experience: '3 yrs' },
+  { id: 'L-009', name: 'Imran Painter',    skill: 'Painter',       phone: '+92 301 7788990', available: true,  rating: 4.5, jobsDone:  87, experience: '6 yrs' },
+  { id: 'L-010', name: 'Sajid Rehman',     skill: 'Painter',       phone: '+92 333 0011223', available: false, rating: 4.3, jobsDone:  61, experience: '4 yrs' },
+  { id: 'L-011', name: 'Bilal Cool',       skill: 'AC Technician', phone: '+92 323 3344556', available: true,  rating: 4.8, jobsDone: 178, experience: '10 yrs' },
+  { id: 'L-012', name: 'Hassan Cooling',   skill: 'AC Technician', phone: '+92 312 6677889', available: true,  rating: 4.6, jobsDone: 112, experience: '7 yrs' },
+  { id: 'L-013', name: 'Usman Gas Wala',   skill: 'Gas Technician',phone: '+92 344 9900112', available: true,  rating: 4.7, jobsDone:  93, experience: '8 yrs' },
+  { id: 'L-014', name: 'Asif Gas Expert',  skill: 'Gas Technician',phone: '+92 302 2233445', available: false, rating: 4.4, jobsDone:  67, experience: '5 yrs' },
+  { id: 'L-015', name: 'Waqar Pest Pro',   skill: 'Pest Control',  phone: '+92 315 5566778', available: true,  rating: 4.6, jobsDone: 134, experience: '6 yrs' },
+  { id: 'L-016', name: 'Danish Labor',     skill: 'General Labor', phone: '+92 321 8899001', available: true,  rating: 4.1, jobsDone:  45, experience: '2 yrs' },
+  { id: 'L-017', name: 'Omer Handyman',    skill: 'General Labor', phone: '+92 343 1122334', available: true,  rating: 4.3, jobsDone:  72, experience: '4 yrs' },
+]
+
 export const FAKE_DETECTION_STATS = [
   { label: 'Total Flagged',   value: '18',   sub: '+3 flagged this week',      color: C.red },
   { label: 'Warnings Issued', value: '11',   sub: '7 pending admin review',    color: C.amber },
