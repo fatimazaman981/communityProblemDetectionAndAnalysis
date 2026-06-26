@@ -1,0 +1,43 @@
+export const darkTheme = {
+  bg: '#0f1117',
+  surface: '#161b27',
+  surfaceHigh: '#1e2535',
+  border: 'rgba(255,255,255,0.07)',
+  primary: '#6366f1',
+  primaryGlow: 'rgba(99,102,241,0.15)',
+  teal: '#14b8a6',
+  tealGlow: 'rgba(20,184,166,0.15)',
+  amber: '#f59e0b',
+  amberGlow: 'rgba(245,158,11,0.15)',
+  red: '#ef4444',
+  redGlow: 'rgba(239,68,68,0.15)',
+  green: '#22c55e',
+  greenGlow: 'rgba(34,197,94,0.15)',
+  purple: '#a855f7',
+  text: '#e2e8f0',
+  textMuted: '#64748b',
+  textDim: '#94a3b8',
+}
+
+export const lightTheme = {
+  bg: '#eef2f7',
+  surface: '#ffffff',
+  surfaceHigh: '#e8edf5',
+  border: 'rgba(0,0,0,0.10)',
+  primary: '#6366f1',
+  primaryGlow: 'rgba(99,102,241,0.15)',
+  teal: '#14b8a6',
+  tealGlow: 'rgba(20,184,166,0.15)',
+  amber: '#f59e0b',
+  amberGlow: 'rgba(245,158,11,0.15)',
+  red: '#ef4444',
+  redGlow: 'rgba(239,68,68,0.15)',
+  green: '#22c55e',
+  greenGlow: 'rgba(34,197,94,0.15)',
+  purple: '#a855f7',
+  text: '#0f172a',
+  textMuted: '#475569',
+  textDim: '#334155',
+}
+
+export const C = darkTheme

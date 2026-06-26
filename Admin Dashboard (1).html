@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CommunityAI — Admin Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Outfit', sans-serif; background: #0f1117; color: #e2e8f0; overflow: hidden; height: 100vh; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+// ─── Color Tokens ───────────────────────────────────────────
+const C = {
+  bg: '#0f1117',
+  surface: '#161b27',
+  surfaceHigh: '#1e2535',
+  border: 'rgba(255,255,255,0.07)',
+  primary: '#6366f1',
+  primaryGlow: 'rgba(99,102,241,0.15)',
+  teal: '#14b8a6',
+  tealGlow: 'rgba(20,184,166,0.15)',
+  amber: '#f59e0b',
+  amberGlow: 'rgba(245,158,11,0.15)',
+  red: '#ef4444',
+  redGlow: 'rgba(239,68,68,0.15)',
+  green: '#22c55e',
+  greenGlow: 'rgba(34,197,94,0.15)',
+  purple: '#a855f7',
+  text: '#e2e8f0',
+  textMuted: '#64748b',
+  textDim: '#94a3b8',
+};
+
+// ─── Utility ────────────────────────────────────────────────
+const Badge = ({ color, children }) => (
+  <span style={{
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    padding: '3px 10px', borderRadius: 100, fontSize: 11, fontWeight: 600,
+    background: color + '22', color,
+    border: `1px solid ${color}44`,
+  }}>{children}</span>
+);
+
+const Card = ({ children, style = {}, glow }) => (
+  <div style={{
+    background: C.surface, border: `1px solid ${C.border}`,
+    borderRadius: 16, padding: 20,
+    boxShadow: glow ? `0 0 40px ${glow}` : 'none',
+    ...style,
+  }}>{children}</div>
+);
+
+// ─── Mini Sparkline ─────────────────────────────────────────
+const Sparkline = ({ data, color, height = 40 }) => {
+  const max = Math.max(...data), min = Math.min(...data);
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * 120;
+    const y = height - ((v - min) / (max - min + 1)) * (height - 4) - 2;
+    return `${x},${y}`;
+  }).join(' ');
+  return (
+    <svg width="120" height={height} style={{ overflow: 'visible' }}>
+      <defs>
+        <linearGradient id={`sg-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.4"/>
+          <stop offset="100%" stopColor={color} stopOpacity="0"/>
+        </linearGradient>
+      </defs>
+      <polygon points={`0,${height} ${pts} 120,${height}`}
+        fill={`url(#sg-${color.replace('#','')})`}/>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+};
+
+// ─── Bar Chart ──────────────────────────────────────────────
+const BarChart = ({ data, colors }) => {
+  const max = Math.max(...data.map(d => d.value));
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 100 }}>
+      {data.map((d, i) => (
+        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <div style={{ fontSize: 10, color: C.textDim, fontWeight: 600 }}>{d.value}</div>
+          <div style={{
+            width: '100%', borderRadius: '6px 6px 0 0',
+            height: `${(d.value / max) * 80}px`,
+            background: colors[i % colors.length],
+            opacity: 0.85,
+            transition: 'height 0.3s',
+          }}/>
+          <div style={{ fontSize: 9, color: C.textMuted, textAlign: 'center' }}>{d.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ─── Donut Chart ─────────────────────────────────────────────
+const DonutChart = ({ slices, size = 100 }) => {
+  const total = slices.reduce((a, s) => a + s.value, 0);
+  let offset = 0;
+  const r = 38, cx = 50, cy = 50, circ = 2 * Math.PI * r;
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100">
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke={C.surfaceHigh} strokeWidth="12"/>
+      {slices.map((s, i) => {
+        const pct = s.value / total;
+        const dash = pct * circ;
+        const gap = circ - dash;
+        const el = (
+          <circle key={i} cx={cx} cy={cy} r={r}
+            fill="none" stroke={s.color} strokeWidth="12"
+            strokeDasharray={`${dash} ${gap}`}
+            strokeDashoffset={-offset * circ / 360 * (360)}
+            transform={`rotate(${-90 + offset * 360} ${cx} ${cy})`}
+            strokeLinecap="butt"
+          />
+        );
+        offset += pct;
+        return el;
+      })}
+    </svg>
+  );
+};
+
+// ─── Line Chart ──────────────────────────────────────────────
+const LineChart = ({ datasets, labels, height = 140 }) => {
+  const allVals = datasets.flatMap(d => d.data);
+  const max = Math.max(...allVals) * 1.1, min = 0;
+  const W = 500, H = height;
+  const px = (i) => (i / (labels.length - 1)) * (W - 40) + 20;
+  const py = (v) => H - 20 - ((v - min) / (max - min)) * (H - 30);
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H+10}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+      {/* grid lines */}
+      {[0,0.25,0.5,0.75,1].map((t,i) => (
+        <line key={i} x1={20} y1={py(t*(max-min))} x2={W-20} y2={py(t*(max-min))}
+          stroke={C.border} strokeWidth="1"/>
+      ))}
+      {/* x labels */}
+      {labels.map((l, i) => (
+        <text key={i} x={px(i)} y={H+6} textAnchor="middle"
+          fontSize="9" fill={C.textMuted} fontFamily="Outfit">{l}</text>
+      ))}
+      {/* lines */}
+      {datasets.map((ds, di) => {
+        const pts = ds.data.map((v,i) => `${px(i)},${py(v)}`).join(' ');
+        const areaBot = `${px(0)},${py(0)} ${ds.data.map((v,i) => `${px(i)},${py(v)}`).join(' ')} ${px(ds.data.length-1)},${py(0)}`;
+        return (
+          <g key={di}>
+            <defs>
+              <linearGradient id={`lg${di}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={ds.color} stopOpacity="0.3"/>
+                <stop offset="100%" stopColor={ds.color} stopOpacity="0"/>
+              </linearGradient>
+            </defs>
+            <polygon points={areaBot} fill={`url(#lg${di})`}/>
+            <polyline points={pts} fill="none" stroke={ds.color} strokeWidth="2.5"
+              strokeLinecap="round" strokeLinejoin="round"/>
+            {ds.data.map((v,i) => (
+              <circle key={i} cx={px(i)} cy={py(v)} r="3"
+                fill={ds.color} stroke={C.surface} strokeWidth="2"/>
+            ))}
+          </g>
+        );
+      })}
+    </svg>
+  );
+};
+
+// ─── Map Visualization ────────────────────────────────────────
+const HotspotMap = () => {
+  const hotspots = [
+    { x: 180, y: 120, r: 28, label: 'Block A', count: 24, color: C.red },
+    { x: 320, y: 180, r: 18, label: 'Block B', count: 12, color: C.amber },
+    { x: 240, y: 260, r: 22, label: 'Block C', count: 18, color: C.red },
+    { x: 140, y: 300, r: 12, label: 'Block D', count: 7, color: C.green },
+    { x: 380, y: 300, r: 15, label: 'Block E', count: 9, color: C.amber },
+    { x: 290, y: 370, r: 10, label: 'Block F', count: 5, color: C.green },
+    { x: 420, y: 200, r: 8, label: 'Block G', count: 4, color: C.green },
+  ];
+  const streets = [
+    'M 80 200 Q 200 150 400 200', 'M 150 100 L 150 400',
+    'M 300 80 L 300 420', 'M 80 300 Q 250 280 460 320',
+    'M 100 180 L 460 180',
+  ];
+  return (
+    <svg width="100%" viewBox="0 0 540 440" style={{ borderRadius: 10 }}>
+      <rect width="540" height="440" fill="#161b27"/>
+      {/* grid */}
+      {Array.from({length:8}).map((_,i)=>(
+        <line key={`h${i}`} x1="0" y1={i*60} x2="540" y2={i*60} stroke="#ffffff05"/>
+      ))}
+      {Array.from({length:10}).map((_,i)=>(
+        <line key={`v${i}`} x1={i*60} y1="0" x2={i*60} y2="440" stroke="#ffffff05"/>
+      ))}
+      {/* Streets */}
+      {streets.map((d,i) => (
+        <path key={i} d={d} stroke="#2d3748" strokeWidth="8" fill="none" strokeLinecap="round"/>
+      ))}
+      {/* Building blocks (random rects) */}
+      {[
+        [90,110,50,40],[160,90,60,35],[250,100,50,50],[360,90,60,40],
+        [90,220,40,45],[440,140,50,40],[80,340,50,40],[430,340,60,45],
+        [350,350,50,35],[190,350,45,40],
+      ].map(([x,y,w,h],i)=>(
+        <rect key={i} x={x} y={y} width={w} height={h} rx="4" fill="#1e2535" stroke="#2d3748" strokeWidth="1"/>
+      ))}
+      {/* Hotspots */}
+      {hotspots.map((h,i) => (
+        <g key={i}>
+          <circle cx={h.x} cy={h.y} r={h.r*2} fill={h.color} opacity="0.08"/>
+          <circle cx={h.x} cy={h.y} r={h.r} fill={h.color} opacity="0.25"/>
+          <circle cx={h.x} cy={h.y} r={h.r*0.5} fill={h.color} opacity="0.9"/>
+          <text x={h.x} y={h.y-h.r-5} textAnchor="middle" fontSize="9" fill={h.color} fontFamily="Outfit" fontWeight="600">
+            {h.label} ({h.count})
+          </text>
+        </g>
+      ))}
+      {/* Legend */}
+      {[{c: C.red, l:'High'},{c: C.amber, l:'Medium'},{c: C.green, l:'Low'}].map((item,i)=>(
+        <g key={i} transform={`translate(${420 + 0}, ${380 + i*16})`}>
+          <circle cx="6" cy="6" r="5" fill={item.c} opacity="0.85"/>
+          <text x="14" y="10" fontSize="9" fill={C.textDim} fontFamily="Outfit">{item.l}</text>
+        </g>
+      ))}
+    </svg>
+  );
+};
+
+// ─── Sidebar Nav ─────────────────────────────────────────────
+const NAV_ITEMS = [
+  { id: 'overview', icon: '⬡', label: 'Overview' },
+  { id: 'complaints', icon: '◈', label: 'Complaints' },
+  { id: 'analytics', icon: '◉', label: 'Analytics' },
+  { id: 'map', icon: '◎', label: 'Hotspot Map' },
+  { id: 'alerts', icon: '⚠', label: 'Alerts' },
+  { id: 'feedback', icon: '★', label: 'Feedback' },
+  { id: 'sentiment', icon: '◑', label: 'Sentiment AI' },
+  { id: 'fakedetect', icon: '⊘', label: 'Fake Detection' },
+  { id: 'users', icon: '◐', label: 'Users' },
+  { id: 'reports', icon: '▤', label: 'Reports' },
+];
+
+const Sidebar = ({ active, setActive }) => (
+  <div style={{
+    width: 220, background: C.surface, borderRight: `1px solid ${C.border}`,
+    display: 'flex', flexDirection: 'column', flexShrink: 0,
+    height: '100vh',
+  }}>
+    {/* Logo */}
+    <div style={{ padding: '24px 20px 20px', borderBottom: `1px solid ${C.border}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: 'linear-gradient(135deg, #6366f1, #14b8a6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 16, fontWeight: 700, color: '#fff',
+        }}>C</div>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>CommunityAI</div>
+          <div style={{ fontSize: 10, color: C.textMuted }}>Admin Portal</div>
+        </div>
+      </div>
+    </div>
+
+    {/* Nav */}
+    <nav style={{ flex: 1, padding: '12px 10px', overflowY: 'auto' }}>
+      <div style={{ fontSize: 10, color: C.textMuted, padding: '8px 10px', fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>Menu</div>
+      {NAV_ITEMS.map(item => {
+        const isActive = active === item.id;
+        return (
+          <button key={item.id} onClick={() => setActive(item.id)} style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
+            background: isActive ? C.primaryGlow : 'transparent',
+            color: isActive ? C.primary : C.textDim,
+            fontFamily: 'Outfit', fontSize: 14, fontWeight: isActive ? 600 : 400,
+            marginBottom: 2, transition: 'all 0.2s',
+            borderLeft: isActive ? `3px solid ${C.primary}` : '3px solid transparent',
+          }}>
+            <span style={{ fontSize: 14 }}>{item.icon}</span>
+            {item.label}
+            {item.id === 'alerts' && (
+              <span style={{
+                marginLeft: 'auto', background: C.red, color: '#fff',
+                borderRadius: 100, fontSize: 10, fontWeight: 700,
+                padding: '1px 6px',
+              }}>3</span>
+            )}
+            {item.id === 'fakedetect' && (
+              <span style={{
+                marginLeft: 'auto', background: C.amber, color: '#000',
+                borderRadius: 100, fontSize: 10, fontWeight: 700,
+                padding: '1px 6px',
+              }}>5</span>
+            )}
+          </button>
+        );
+      })}
+    </nav>
+
+    {/* Admin Profile */}
+    <div style={{ padding: '16px', borderTop: `1px solid ${C.border}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: '50%',
+          background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', fontWeight: 700, fontSize: 14,
+        }}>A</div>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Admin</div>
+          <div style={{ fontSize: 10, color: C.textMuted }}>Green Acres Society</div>
+        </div>
+        <div style={{ marginLeft: 'auto', width: 8, height: 8, borderRadius: '50%', background: C.green }}/>
+      </div>
+    </div>
+  </div>
+);
+
+// ─── Stat Card ────────────────────────────────────────────────
+const StatCard = ({ label, value, sub, color, spark, icon, delta }) => (
+  <Card glow={color + '18'} style={{ flex: 1 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div>
+        <div style={{ fontSize: 11, color: C.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>{label}</div>
+        <div style={{ fontSize: 32, fontWeight: 800, color: C.text, lineHeight: 1 }}>{value}</div>
+        <div style={{ fontSize: 12, color: delta > 0 ? C.green : delta < 0 ? C.red : C.textMuted, marginTop: 6, fontWeight: 500 }}>
+          {delta > 0 ? '↑' : delta < 0 ? '↓' : ''} {sub}
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+        <div style={{
+          width: 40, height: 40, borderRadius: 12,
+          background: color + '22', color, fontSize: 18,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>{icon}</div>
+        <Sparkline data={spark} color={color}/>
+      </div>
+    </div>
+  </Card>
+);
+
+// ─── Complaints Table ─────────────────────────────────────────
+const COMPLAINTS = [
+  { id: '#C-1042', resident: 'Aasma Iqbal', category: 'Water Supply', severity: 'Critical', status: 'In Progress', time: '2h ago', block: 'Block A', ai: '94%' },
+  { id: '#C-1041', resident: 'Fatima Zaman', category: 'Electricity', severity: 'High', status: 'Pending', time: '3h ago', block: 'Block C', ai: '89%' },
+  { id: '#C-1040', resident: 'Ali Hassan', category: 'Garbage', severity: 'Medium', status: 'Resolved', time: '5h ago', block: 'Block B', ai: '97%' },
+  { id: '#C-1039', resident: 'Sara Khan', category: 'Security', severity: 'Critical', status: 'Open', time: '6h ago', block: 'Block A', ai: '91%' },
+  { id: '#C-1038', resident: 'Ahmed Raza', category: 'Road Damage', severity: 'Low', status: 'Resolved', time: '8h ago', block: 'Block E', ai: '85%' },
+  { id: '#C-1037', resident: 'Kinza Awan', category: 'Water Supply', severity: 'High', status: 'In Progress', time: '10h ago', block: 'Block D', ai: '92%' },
+  { id: '#C-1036', resident: 'Umar Farooq', category: 'Flooding', severity: 'Critical', status: 'Open', time: '12h ago', block: 'Block C', ai: '98%' },
+];
+
+const severityColor = s => s === 'Critical' ? C.red : s === 'High' ? C.amber : s === 'Medium' ? C.primary : C.green;
+const statusColor = s => s === 'Resolved' ? C.green : s === 'In Progress' ? C.teal : s === 'Pending' ? C.amber : C.purple;
+
+// ─── Overview Page ────────────────────────────────────────────
+const OverviewPage = () => {
+  const [selectedComplaint, setSelectedComplaint] = useState(null);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Stat Cards */}
+      <div style={{ display: 'flex', gap: 16 }}>
+        <StatCard label="Total Complaints" value="1,284" sub="+12% this week" delta={1}
+          color={C.primary} icon="◈"
+          spark={[40,52,48,65,58,72,68,85,78,92]}/>
+        <StatCard label="Resolved Today" value="47" sub="+8 from yesterday" delta={1}
+          color={C.green} icon="✓"
+          spark={[20,28,22,35,30,40,38,44,42,47]}/>
+        <StatCard label="Pending" value="83" sub="-5 from yesterday" delta={-1}
+          color={C.amber} icon="◷"
+          spark={[90,85,88,82,86,84,88,83,85,83]}/>
+        <StatCard label="Urgent Alerts" value="3" sub="Requires attention" delta={0}
+          color={C.red} icon="⚠"
+          spark={[1,3,2,4,3,5,4,6,4,3]}/>
+      </div>
+
+      {/* Charts Row */}
+      <div style={{ display: 'flex', gap: 16 }}>
+        {/* Complaint Trend */}
+        <Card style={{ flex: 2 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Complaint Trends</div>
+              <div style={{ fontSize: 11, color: C.textMuted }}>Last 7 days</div>
+            </div>
+            <div style={{ display: 'flex', gap: 16, fontSize: 11 }}>
+              {[{c: C.primary, l:'Submitted'},{c: C.green, l:'Resolved'}].map((d,i)=>(
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, color: C.textDim }}>
+                  <div style={{ width: 20, height: 2, background: d.c, borderRadius: 1 }}/>
+                  {d.l}
+                </div>
+              ))}
+            </div>
+          </div>
+          <LineChart
+            labels={['Mon','Tue','Wed','Thu','Fri','Sat','Sun']}
+            datasets={[
+              { data: [42, 58, 53, 67, 61, 48, 55], color: C.primary },
+              { data: [30, 45, 50, 55, 58, 44, 47], color: C.green },
+            ]}
+          />
+        </Card>
+
+        {/* Category Donut */}
+        <Card style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>By Category</div>
+          <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 14 }}>This month</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <DonutChart size={90} slices={[
+              { value: 32, color: C.primary },
+              { value: 24, color: C.amber },
+              { value: 18, color: C.red },
+              { value: 14, color: C.teal },
+              { value: 12, color: C.purple },
+            ]}/>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {[
+                { label: 'Water Supply', v: '32%', color: C.primary },
+                { label: 'Electricity', v: '24%', color: C.amber },
+                { label: 'Security', v: '18%', color: C.red },
+                { label: 'Garbage', v: '14%', color: C.teal },
+                { label: 'Other', v: '12%', color: C.purple },
+              ].map((d,i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: d.color, flexShrink: 0 }}/>
+                  <span style={{ fontSize: 10, color: C.textDim, flex: 1 }}>{d.label}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: C.text }}>{d.v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Recent Complaints */}
+      <Card>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Recent Complaints</div>
+            <div style={{ fontSize: 11, color: C.textMuted }}>Latest submissions from residents</div>
+          </div>
+          <button style={{
+            background: C.primaryGlow, border: `1px solid ${C.primary}44`,
+            color: C.primary, fontFamily: 'Outfit', fontSize: 12, fontWeight: 600,
+            padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
+          }}>View All</button>
+        </div>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              {['ID','Resident','Category','Block','Severity','Status','AI Conf.','Time'].map(h => (
+                <th key={h} style={{
+                  textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.textMuted,
+                  padding: '6px 10px', borderBottom: `1px solid ${C.border}`,
+                  textTransform: 'uppercase', letterSpacing: 0.8,
+                }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {COMPLAINTS.map((c, i) => (
+              <tr key={i} onClick={() => setSelectedComplaint(c)} style={{
+                cursor: 'pointer', transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = C.surfaceHigh}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <td style={{ padding: '10px 10px', fontSize: 12, color: C.primary, fontWeight: 600 }}>{c.id}</td>
+                <td style={{ padding: '10px 10px', fontSize: 12, color: C.text }}>{c.resident}</td>
+                <td style={{ padding: '10px 10px', fontSize: 12, color: C.textDim }}>{c.category}</td>
+                <td style={{ padding: '10px 10px', fontSize: 12, color: C.textDim }}>{c.block}</td>
+                <td style={{ padding: '10px 10px' }}><Badge color={severityColor(c.severity)}>{c.severity}</Badge></td>
+                <td style={{ padding: '10px 10px' }}><Badge color={statusColor(c.status)}>{c.status}</Badge></td>
+                <td style={{ padding: '10px 10px', fontSize: 12, fontWeight: 700, color: C.teal }}>{c.ai}</td>
+                <td style={{ padding: '10px 10px', fontSize: 11, color: C.textMuted }}>{c.time}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+
+      {/* Detail Modal */}
+      {selectedComplaint && (
+        <div onClick={() => setSelectedComplaint(null)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: C.surface, border: `1px solid ${C.border}`,
+            borderRadius: 20, padding: 28, width: 480,
+            boxShadow: `0 40px 80px rgba(0,0,0,0.5)`,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{selectedComplaint.id}</div>
+                <div style={{ fontSize: 12, color: C.textMuted }}>{selectedComplaint.time} · {selectedComplaint.block}</div>
+              </div>
+              <button onClick={() => setSelectedComplaint(null)} style={{
+                background: 'transparent', border: 'none', color: C.textMuted, fontSize: 20, cursor: 'pointer',
+              }}>✕</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
+              {[
+                { label: 'Resident', value: selectedComplaint.resident },
+                { label: 'Category', value: selectedComplaint.category },
+                { label: 'Severity', value: selectedComplaint.severity },
+                { label: 'AI Confidence', value: selectedComplaint.ai },
+              ].map((item, i) => (
+                <div key={i} style={{ background: C.surfaceHigh, borderRadius: 10, padding: '12px 14px' }}>
+                  <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4, fontWeight: 600, textTransform: 'uppercase' }}>{item.label}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{item.value}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button style={{
+                flex: 1, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                background: C.primaryGlow, color: C.primary, fontFamily: 'Outfit', fontSize: 13, fontWeight: 600,
+              }}>Assign Team</button>
+              <button style={{
+                flex: 1, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                background: 'linear-gradient(135deg, #6366f1, #14b8a6)', color: '#fff',
+                fontFamily: 'Outfit', fontSize: 13, fontWeight: 600,
+              }}>Mark Resolved</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Analytics Page ───────────────────────────────────────────
+const AnalyticsPage = () => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', gap: 16 }}>
+      <Card style={{ flex: 1 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Monthly Submissions</div>
+        <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 16 }}>Jan – Apr 2026</div>
+        <BarChart
+          data={[
+            {label:'Jan',value:210},{label:'Feb',value:185},{label:'Mar',value:247},{label:'Apr',value:165},
+          ]}
+          colors={[C.primary, C.teal, C.purple, C.amber]}
+        />
+      </Card>
+      <Card style={{ flex: 1 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Resolution Rate</div>
+        <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 14 }}>This month: 78%</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <DonutChart size={90} slices={[
+            {value: 78, color: C.green},
+            {value: 22, color: C.surfaceHigh},
+          ]}/>
+          <div>
+            <div style={{ fontSize: 32, fontWeight: 800, color: C.green }}>78%</div>
+            <div style={{ fontSize: 11, color: C.textMuted }}>+6% from last month</div>
+            <div style={{ marginTop: 10, fontSize: 11, color: C.textDim }}>Avg. resolution: <b style={{color:C.text}}>1.8 days</b></div>
+          </div>
+        </div>
+      </Card>
+      <Card style={{ flex: 1 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>AI Performance</div>
+        <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 14 }}>Classification accuracy</div>
+        <div style={{ fontSize: 36, fontWeight: 800, color: C.primary }}>94.2%</div>
+        <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>Avg. confidence score</div>
+        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[
+            { label: 'Flooding', pct: 98, color: C.red },
+            { label: 'Electricity', pct: 95, color: C.amber },
+            { label: 'Water', pct: 94, color: C.primary },
+            { label: 'Garbage', pct: 91, color: C.teal },
+          ].map((d,i)=>(
+            <div key={i}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.textDim, marginBottom: 3 }}>
+                <span>{d.label}</span><span style={{color:d.color,fontWeight:700}}>{d.pct}%</span>
+              </div>
+              <div style={{ height: 4, borderRadius: 4, background: C.surfaceHigh }}>
+                <div style={{ height: '100%', width: `${d.pct}%`, borderRadius: 4, background: d.color }}/>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+    <Card>
+      <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Complaint Volume — Last 30 Days</div>
+      <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 16 }}>By category</div>
+      <LineChart height={160}
+        labels={['W1','W2','W3','W4']}
+        datasets={[
+          {data:[42,58,53,67], color:C.primary},
+          {data:[20,32,28,40], color:C.amber},
+          {data:[15,18,22,19], color:C.red},
+          {data:[30,25,38,33], color:C.teal},
+        ]}
+      />
+      <div style={{ display: 'flex', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
+        {[{c:C.primary,l:'Water'},{c:C.amber,l:'Electricity'},{c:C.red,l:'Security'},{c:C.teal,l:'Garbage'}].map((d,i)=>(
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: C.textDim }}>
+            <div style={{ width: 16, height: 2, background: d.c, borderRadius: 1 }}/>
+            {d.l}
+          </div>
+        ))}
+      </div>
+    </Card>
+    <div style={{ display: 'flex', gap: 16 }}>
+      <Card style={{ flex: 1 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Top Blocks by Complaints</div>
+        <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 16 }}>This month</div>
+        <BarChart
+          data={[{label:'A',value:68},{label:'B',value:45},{label:'C',value:72},{label:'D',value:30},{label:'E',value:40},{label:'F',value:22}]}
+          colors={[C.red,C.amber,C.red,C.green,C.amber,C.green]}
+        />
+      </Card>
+      <Card style={{ flex: 1 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Response Time (hrs)</div>
+        <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 16 }}>Avg. by category</div>
+        <BarChart
+          data={[{label:'Security',value:1.2},{label:'Flood',value:0.8},{label:'Power',value:3.5},{label:'Water',value:4.1},{label:'Garbage',value:8.2}]}
+          colors={[C.red,C.red,C.amber,C.amber,C.teal]}
+        />
+      </Card>
+    </div>
+  </div>
+);
+
+// ─── Map Page ─────────────────────────────────────────────────
+const MapPage = () => (
+  <div style={{ display: 'flex', gap: 16 }}>
+    <Card style={{ flex: 2 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Complaint Hotspot Map</div>
+      <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 12 }}>Green Acres Housing Society · Live view</div>
+      <HotspotMap/>
+    </Card>
+    <Card style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Block Summary</div>
+      {[
+        { block: 'Block A', count: 24, trend: 'up', color: C.red, top: 'Water Supply' },
+        { block: 'Block C', count: 18, trend: 'up', color: C.red, top: 'Flooding' },
+        { block: 'Block B', count: 12, trend: 'stable', color: C.amber, top: 'Electricity' },
+        { block: 'Block E', count: 9, trend: 'down', color: C.amber, top: 'Garbage' },
+        { block: 'Block D', count: 7, trend: 'down', color: C.green, top: 'Road Damage' },
+        { block: 'Block F', count: 5, trend: 'down', color: C.green, top: 'Noise' },
+        { block: 'Block G', count: 4, trend: 'stable', color: C.green, top: 'Lighting' },
+      ].map((b,i) => (
+        <div key={i} style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '10px 12px', borderRadius: 10, background: C.surfaceHigh,
+        }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 8,
+            background: b.color + '22', color: b.color,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 11, fontWeight: 700,
+          }}>{b.block.replace('Block ','')}</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{b.block}</div>
+            <div style={{ fontSize: 10, color: C.textMuted }}>Top: {b.top}</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: b.color }}>{b.count}</div>
+            <div style={{ fontSize: 10, color: b.trend === 'up' ? C.red : b.trend === 'down' ? C.green : C.textMuted }}>
+              {b.trend === 'up' ? '↑' : b.trend === 'down' ? '↓' : '→'}
+            </div>
+          </div>
+        </div>
+      ))}
+    </Card>
+  </div>
+);
+
+// ─── Alerts Page ──────────────────────────────────────────────
+const AlertsPage = () => {
+  const [dismissed, setDismissed] = useState([]);
+  const alerts = [
+    { id: 1, type: 'FLOOD RISK', resident: 'Umar Farooq', block: 'Block C', desc: 'Severe water accumulation reported near main road. AI classified as Critical flooding event.', time: '12 min ago', icon: '🌊' },
+    { id: 2, type: 'FIRE HAZARD', resident: 'Sara Khan', block: 'Block A', desc: 'Electrical sparks near transformer reported. Immediate attention required.', time: '34 min ago', icon: '🔥' },
+    { id: 3, type: 'SECURITY BREACH', resident: 'Bilal Ahmed', block: 'Block A', desc: 'Unauthorized entry attempt reported at Block A gate. Security team notified.', time: '1h ago', icon: '🚨' },
+  ];
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px',
+        background: C.redGlow, border: `1px solid ${C.red}44`, borderRadius: 12,
+      }}>
+        <div style={{ fontSize: 20 }}>⚠</div>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.red }}>3 Active Emergency Alerts</div>
+          <div style={{ fontSize: 11, color: C.textDim }}>Urgent complaints requiring immediate action</div>
+        </div>
+      </div>
+      {alerts.filter(a => !dismissed.includes(a.id)).map(a => (
+        <Card key={a.id} glow={C.red + '20'} style={{ borderColor: C.red + '33' }}>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: 14, background: C.redGlow,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0,
+            }}>{a.icon}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <Badge color={C.red}>{a.type}</Badge>
+                <span style={{ fontSize: 11, color: C.textMuted }}>{a.time}</span>
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 4 }}>{a.resident} · {a.block}</div>
+              <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5 }}>{a.desc}</div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                <button style={{
+                  padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                  background: 'linear-gradient(135deg, #ef4444, #b91c1c)', color: '#fff',
+                  fontFamily: 'Outfit', fontSize: 12, fontWeight: 600,
+                }}>Dispatch Team</button>
+                <button style={{
+                  padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                  background: C.amberGlow, color: C.amber,
+                  fontFamily: 'Outfit', fontSize: 12, fontWeight: 600,
+                  border: `1px solid ${C.amber}44`,
+                }}>Notify Block</button>
+                <button onClick={() => setDismissed(d => [...d, a.id])} style={{
+                  padding: '8px 16px', borderRadius: 8, border: `1px solid ${C.border}`, cursor: 'pointer',
+                  background: 'transparent', color: C.textMuted,
+                  fontFamily: 'Outfit', fontSize: 12, fontWeight: 600,
+                }}>Dismiss</button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      ))}
+      {dismissed.length > 0 && (
+        <div style={{ fontSize: 12, color: C.textMuted, textAlign: 'center' }}>
+          {dismissed.length} alert(s) dismissed ·
+          <button onClick={() => setDismissed([])} style={{ background: 'none', border: 'none', color: C.primary, cursor: 'pointer', fontFamily: 'Outfit', fontSize: 12 }}> Restore</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Users Page ───────────────────────────────────────────────
+const UsersPage = () => {
+  const users = [
+    { name: 'Aasma Iqbal', block: 'Block A', unit: 'A-12', complaints: 8, joined: 'Jan 2026', status: 'Active', initials: 'AI' },
+    { name: 'Fatima Zaman', block: 'Block C', unit: 'C-07', complaints: 5, joined: 'Feb 2026', status: 'Active', initials: 'FZ' },
+    { name: 'Ali Hassan', block: 'Block B', unit: 'B-03', complaints: 12, joined: 'Dec 2025', status: 'Active', initials: 'AH' },
+    { name: 'Sara Khan', block: 'Block A', unit: 'A-05', complaints: 3, joined: 'Mar 2026', status: 'Active', initials: 'SK' },
+    { name: 'Ahmed Raza', block: 'Block E', unit: 'E-09', complaints: 1, joined: 'Apr 2026', status: 'Active', initials: 'AR' },
+    { name: 'Kinza Awan', block: 'Block D', unit: 'D-11', complaints: 7, joined: 'Jan 2026', status: 'Suspended', initials: 'KA' },
+    { name: 'Umar Farooq', block: 'Block C', unit: 'C-02', complaints: 15, joined: 'Nov 2025', status: 'Active', initials: 'UF' },
+  ];
+  const colors = [C.primary, C.teal, C.purple, C.amber, C.red, C.green];
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 4 }}>
+        {[
+          {label:'Total Residents', value:'247', color: C.primary},
+          {label:'Active Users', value:'231', color: C.green},
+          {label:'New This Month', value:'14', color: C.teal},
+          {label:'Suspended', value:'2', color: C.red},
+        ].map((s,i)=>(
+          <Card key={i} style={{ flex: 1, padding: '14px 18px' }}>
+            <div style={{ fontSize: 11, color: C.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>{s.label}</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: s.color, marginTop: 4 }}>{s.value}</div>
+          </Card>
+        ))}
+      </div>
+      <Card>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 14 }}>Resident Accounts</div>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              {['Resident','Block','Unit','Complaints','Joined','Status','Actions'].map(h => (
+                <th key={h} style={{
+                  textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.textMuted,
+                  padding: '6px 10px', borderBottom: `1px solid ${C.border}`,
+                  textTransform: 'uppercase', letterSpacing: 0.8,
+                }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((u,i) => (
+              <tr key={i}
+                onMouseEnter={e=>e.currentTarget.style.background=C.surfaceHigh}
+                onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+                style={{ transition: 'background 0.15s' }}>
+                <td style={{ padding: '10px 10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: '50%',
+                      background: colors[i % colors.length] + '33',
+                      color: colors[i % colors.length], fontWeight: 700, fontSize: 11,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>{u.initials}</div>
+                    <span style={{ fontSize: 12, color: C.text, fontWeight: 600 }}>{u.name}</span>
+                  </div>
+                </td>
+                <td style={{ padding: '10px', fontSize: 12, color: C.textDim }}>{u.block}</td>
+                <td style={{ padding: '10px', fontSize: 12, color: C.textDim }}>{u.unit}</td>
+                <td style={{ padding: '10px', fontSize: 12, fontWeight: 700, color: u.complaints > 10 ? C.red : C.text }}>{u.complaints}</td>
+                <td style={{ padding: '10px', fontSize: 11, color: C.textMuted }}>{u.joined}</td>
+                <td style={{ padding: '10px' }}><Badge color={u.status === 'Active' ? C.green : C.red}>{u.status}</Badge></td>
+                <td style={{ padding: '10px' }}>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button style={{
+                      padding: '4px 10px', borderRadius: 6, border: `1px solid ${C.border}`,
+                      background: 'transparent', color: C.textDim, fontSize: 11, cursor: 'pointer', fontFamily: 'Outfit',
+                    }}>View</button>
+                    <button style={{
+                      padding: '4px 10px', borderRadius: 6, border: `1px solid ${C.primary}44`,
+                      background: C.primaryGlow, color: C.primary, fontSize: 11, cursor: 'pointer', fontFamily: 'Outfit',
+                    }}>Edit</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+};
+
+// ─── Reports Page ─────────────────────────────────────────────
+const ReportsPage = () => {
+  const reports = [
+    { title: 'Monthly Summary — April 2026', desc: 'Total submissions, resolution rate, avg response time', icon: '📊', color: C.primary },
+    { title: 'Category Breakdown — Q1 2026', desc: 'Complaints by type with trend analysis', icon: '◈', color: C.teal },
+    { title: 'Urgent Incidents Log', desc: 'All critical and emergency complaints this month', icon: '⚠', color: C.red },
+    { title: 'AI Performance Report', desc: 'Classification accuracy, confidence scores, model metrics', icon: '◉', color: C.purple },
+    { title: 'Resident Activity Report', desc: 'Top submitters, block-wise participation', icon: '◐', color: C.amber },
+    { title: 'Block-wise Analysis', desc: 'Hotspot blocks, recurring issues, resolution time', icon: '▤', color: C.green },
+  ];
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{
+        padding: '16px 20px', background: C.primaryGlow, border: `1px solid ${C.primary}33`,
+        borderRadius: 12, fontSize: 13, color: C.textDim,
+      }}>
+        Generate and download reports for Green Acres Housing Society. All reports are auto-generated from live data.
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+        {reports.map((r,i) => (
+          <Card key={i} style={{ cursor: 'pointer' }}
+            glow={r.color + '18'}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: r.color + '22', color: r.color,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+              }}>{r.icon}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.text, flex: 1, lineHeight: 1.3 }}>{r.title}</div>
+            </div>
+            <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 14, lineHeight: 1.5 }}>{r.desc}</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button style={{
+                flex: 1, padding: '7px', borderRadius: 8, border: `1px solid ${r.color}44`,
+                background: r.color + '15', color: r.color,
+                fontFamily: 'Outfit', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              }}>Download PDF</button>
+              <button style={{
+                padding: '7px 12px', borderRadius: 8, border: `1px solid ${C.border}`,
+                background: 'transparent', color: C.textDim,
+                fontFamily: 'Outfit', fontSize: 11, cursor: 'pointer',
+              }}>Preview</button>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ─── Star Rating ─────────────────────────────────────────────
+const Stars = ({ rating, size = 14 }) => (
+  <span style={{ color: C.amber, fontSize: size, letterSpacing: 1 }}>
+    {[1,2,3,4,5].map(i => <span key={i} style={{ opacity: i <= rating ? 1 : 0.25 }}>★</span>)}
+  </span>
+);
+
+// ─── Feedback Page ────────────────────────────────────────────
+const FeedbackPage = () => {
+  const feedbacks = [
+    { id:'#C-1040', resident:'Ali Hassan', category:'Garbage', rating:5, comment:'Issue was resolved very quickly! The team arrived within hours.', time:'2h ago', block:'Block B' },
+    { id:'#C-1033', resident:'Sara Khan', category:'Electricity', rating:4, comment:'Good response but took a day longer than expected.', time:'1d ago', block:'Block A' },
+    { id:'#C-1029', resident:'Nadia Malik', category:'Water Supply', rating:2, comment:'Problem was marked resolved but still partially present.', time:'2d ago', block:'Block C' },
+    { id:'#C-1025', resident:'Umar Farooq', category:'Road Damage', rating:5, comment:'Excellent service! Road repaired within 48 hours.', time:'3d ago', block:'Block C' },
+    { id:'#C-1019', resident:'Bilal Ahmed', category:'Security', rating:3, comment:'Guard was deployed but issue recurred after 2 days.', time:'4d ago', block:'Block A' },
+    { id:'#C-1012', resident:'Ayesha Tariq', category:'Garbage', rating:5, comment:'Prompt response. Very satisfied with the outcome.', time:'5d ago', block:'Block D' },
+  ];
+  const avg = (feedbacks.reduce((a,f)=>a+f.rating,0)/feedbacks.length).toFixed(1);
+  const dist = [5,4,3,2,1].map(r => ({ r, count: feedbacks.filter(f=>f.rating===r).length }));
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+      <div style={{ display:'flex', gap:16 }}>
+        {/* Rating Summary */}
+        <Card style={{ flex:1 }} glow={C.amber+'18'}>
+          <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:12 }}>Overall Rating</div>
+          <div style={{ display:'flex', alignItems:'center', gap:20 }}>
+            <div style={{ textAlign:'center' }}>
+              <div style={{ fontSize:48, fontWeight:800, color:C.amber, lineHeight:1 }}>{avg}</div>
+              <Stars rating={Math.round(avg)} size={16}/>
+              <div style={{ fontSize:11, color:C.textMuted, marginTop:4 }}>{feedbacks.length} reviews</div>
+            </div>
+            <div style={{ flex:1, display:'flex', flexDirection:'column', gap:5 }}>
+              {dist.map(({r,count})=>(
+                <div key={r} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:11, color:C.amber, width:8 }}>{r}</span>
+                  <div style={{ flex:1, height:6, borderRadius:4, background:C.surfaceHigh }}>
+                    <div style={{ height:'100%', borderRadius:4, background:C.amber, width:`${(count/feedbacks.length)*100}%` }}/>
+                  </div>
+                  <span style={{ fontSize:11, color:C.textMuted, width:16, textAlign:'right' }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+        {[
+          { label:'5★ Rate', value:'50%', color:C.green, sub:'Excellent feedback' },
+          { label:'Avg Response', value:'1.8d', color:C.teal, sub:'To resolution' },
+          { label:'Satisfaction', value:'78%', color:C.primary, sub:'Positive reviews' },
+        ].map((s,i)=>(
+          <Card key={i} style={{ flex:1 }}>
+            <div style={{ fontSize:11, color:C.textMuted, fontWeight:600, textTransform:'uppercase', letterSpacing:0.8 }}>{s.label}</div>
+            <div style={{ fontSize:32, fontWeight:800, color:s.color, marginTop:6 }}>{s.value}</div>
+            <div style={{ fontSize:11, color:C.textMuted, marginTop:4 }}>{s.sub}</div>
+          </Card>
+        ))}
+      </div>
+      <Card>
+        <div style={{ fontSize:14, fontWeight:700, color:C.text, marginBottom:14 }}>Resident Feedback</div>
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {feedbacks.map((f,i)=>(
+            <div key={i} style={{
+              padding:'14px 16px', borderRadius:12, background:C.surfaceHigh,
+              borderLeft:`3px solid ${f.rating>=4?C.green:f.rating===3?C.amber:C.red}`,
+            }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <div style={{
+                    width:32, height:32, borderRadius:'50%',
+                    background:C.primary+'33', color:C.primary,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontSize:11, fontWeight:700,
+                  }}>{f.resident.split(' ').map(n=>n[0]).join('')}</div>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:600, color:C.text }}>{f.resident}</div>
+                    <div style={{ fontSize:10, color:C.textMuted }}>{f.id} · {f.category} · {f.block}</div>
+                  </div>
+                </div>
+                <div style={{ textAlign:'right' }}>
+                  <Stars rating={f.rating}/>
+                  <div style={{ fontSize:10, color:C.textMuted, marginTop:2 }}>{f.time}</div>
+                </div>
+              </div>
+              <div style={{ fontSize:12, color:C.textDim, lineHeight:1.5, paddingLeft:42 }}>"{f.comment}"</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+// ─── Sentiment Page ────────────────────────────────────────────
+const SentimentPage = () => {
+  const [activeMsg, setActiveMsg] = useState(null);
+  const msgs = [
+    { user:'Aasma I.', msg:'The water issue in Block A has been going on for 3 days now, still no update!', sentiment:'negative', score:0.14, time:'10m ago' },
+    { user:'Ali H.', msg:'Thanks to the team for fixing the garbage issue so fast. Really appreciate it!', sentiment:'positive', score:0.91, time:'22m ago' },
+    { user:'Sara K.', msg:'When will the security cameras in Block A be repaired? Its been a week.', sentiment:'negative', score:0.22, time:'35m ago' },
+    { user:'Ahmed R.', msg:'Road in Block E fixed! Great work by the admin team this time.', sentiment:'positive', score:0.87, time:'1h ago' },
+    { user:'Nadia M.', msg:'Electricity fluctuations are still happening. Not satisfied with the resolution.', sentiment:'neutral', score:0.45, time:'1h ago' },
+    { user:'Umar F.', msg:'Flooding near gate 2 is dangerous. Emergency response needed immediately!', sentiment:'negative', score:0.08, time:'2h ago' },
+    { user:'Kinza A.', msg:'New park in Block D looks amazing. Community is very happy with it.', sentiment:'positive', score:0.95, time:'3h ago' },
+  ];
+  const pos = msgs.filter(m=>m.sentiment==='positive').length;
+  const neg = msgs.filter(m=>m.sentiment==='negative').length;
+  const neu = msgs.filter(m=>m.sentiment==='neutral').length;
+  const sentColor = s => s==='positive'?C.green:s==='negative'?C.red:C.amber;
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+      <div style={{ display:'flex', gap:16 }}>
+        {[
+          { label:'Overall Sentiment', value:'Moderate', color:C.amber, sub:'Based on last 24h' },
+          { label:'Positive', value:pos, color:C.green, sub:`${Math.round(pos/msgs.length*100)}% of messages` },
+          { label:'Negative', value:neg, color:C.red, sub:`${Math.round(neg/msgs.length*100)}% of messages` },
+          { label:'Neutral', value:neu, color:C.amber, sub:`${Math.round(neu/msgs.length*100)}% of messages` },
+        ].map((s,i)=>(
+          <Card key={i} style={{ flex:1 }}>
+            <div style={{ fontSize:11, color:C.textMuted, fontWeight:600, textTransform:'uppercase', letterSpacing:0.8 }}>{s.label}</div>
+            <div style={{ fontSize:28, fontWeight:800, color:s.color, marginTop:6 }}>{s.value}</div>
+            <div style={{ fontSize:11, color:C.textMuted, marginTop:4 }}>{s.sub}</div>
+          </Card>
+        ))}
+      </div>
+      <div style={{ display:'flex', gap:16 }}>
+        <Card style={{ flex:2 }}>
+          <div style={{ fontSize:14, fontWeight:700, color:C.text, marginBottom:4 }}>Community Chat Feed</div>
+          <div style={{ fontSize:11, color:C.textMuted, marginBottom:14 }}>AI sentiment tagged in real-time</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {msgs.map((m,i)=>(
+              <div key={i} style={{
+                padding:'12px 14px', borderRadius:12,
+                background:C.surfaceHigh,
+                borderLeft:`3px solid ${sentColor(m.sentiment)}`,
+                cursor:'pointer', transition:'opacity 0.15s',
+              }}
+              onClick={()=>setActiveMsg(activeMsg===i?null:i)}
+              >
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <div style={{
+                      width:28, height:28, borderRadius:'50%',
+                      background:sentColor(m.sentiment)+'33', color:sentColor(m.sentiment),
+                      display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700,
+                    }}>{m.user.split(' ')[0][0]}</div>
+                    <span style={{ fontSize:12, fontWeight:600, color:C.text }}>{m.user}</span>
+                    <Badge color={sentColor(m.sentiment)}>{m.sentiment}</Badge>
+                  </div>
+                  <span style={{ fontSize:10, color:C.textMuted }}>{m.time}</span>
+                </div>
+                <div style={{ fontSize:12, color:C.textDim, paddingLeft:36, lineHeight:1.5 }}>{m.msg}</div>
+                {activeMsg===i && (
+                  <div style={{
+                    marginTop:10, paddingLeft:36, display:'flex', alignItems:'center', gap:10,
+                  }}>
+                    <div style={{ fontSize:11, color:C.textMuted }}>AI Confidence:</div>
+                    <div style={{ flex:1, height:6, borderRadius:4, background:C.bg }}>
+                      <div style={{
+                        height:'100%', borderRadius:4,
+                        background:`linear-gradient(90deg, ${sentColor(m.sentiment)}, ${sentColor(m.sentiment)}88)`,
+                        width:`${m.score*100}%`, transition:'width 0.4s',
+                      }}/>
+                    </div>
+                    <div style={{ fontSize:11, fontWeight:700, color:sentColor(m.sentiment) }}>{Math.round(m.score*100)}%</div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+        <Card style={{ flex:1, display:'flex', flexDirection:'column', gap:16 }}>
+          <div style={{ fontSize:14, fontWeight:700, color:C.text }}>Sentiment Trend</div>
+          <LineChart height={120}
+            labels={['Mon','Tue','Wed','Thu','Fri','Sat','Sun']}
+            datasets={[
+              { data:[55,62,48,70,65,58,63], color:C.green },
+              { data:[30,25,38,22,28,32,25], color:C.red },
+            ]}
+          />
+          <div style={{ display:'flex', gap:12, fontSize:11 }}>
+            {[{c:C.green,l:'Positive'},{c:C.red,l:'Negative'}].map((d,i)=>(
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:5, color:C.textDim }}>
+                <div style={{ width:14, height:2, background:d.c, borderRadius:1 }}/>
+                {d.l}
+              </div>
+            ))}
+          </div>
+          <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:14 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:C.text, marginBottom:10 }}>Hot Topics</div>
+            {['Water Supply Issues','Electricity Outages','Security Concerns','Garbage Collection','Flooding Risk'].map((t,i)=>(
+              <div key={i} style={{
+                display:'flex', justifyContent:'space-between', alignItems:'center',
+                padding:'6px 0', borderBottom:`1px solid ${C.border}`,
+              }}>
+                <span style={{ fontSize:11, color:C.textDim }}>{t}</span>
+                <div style={{
+                  width:8, height:8, borderRadius:'50%',
+                  background:[C.red,C.amber,C.red,C.teal,C.red][i],
+                }}/>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+// ─── Fake Detection Page ───────────────────────────────────────
+const FakeDetectionPage = () => {
+  const [warned, setWarned] = useState([]);
+  const [banned, setBanned] = useState([]);
+  const flagged = [
+    { name:'Rashid Mehmood', block:'Block B', unit:'B-08', fakeCount:7, totalComplaints:9, pattern:'Repetitive low-detail submissions, 3 marked invalid by AI', riskScore:92, initials:'RM' },
+    { name:'Zahid Ali', block:'Block C', unit:'C-14', fakeCount:5, totalComplaints:8, pattern:'GPS spoofing detected on 4 complaints', riskScore:84, initials:'ZA' },
+    { name:'Sana Butt', block:'Block A', unit:'A-22', fakeCount:4, totalComplaints:7, pattern:'Duplicate complaints submitted within minutes', riskScore:76, initials:'SB' },
+    { name:'Tariq Javed', block:'Block E', unit:'E-03', fakeCount:3, totalComplaints:10, pattern:'AI confidence below 40% on 3 submissions', riskScore:61, initials:'TJ' },
+    { name:'Hina Qureshi', block:'Block D', unit:'D-07', fakeCount:2, totalComplaints:6, pattern:'Same photo used on 2 different complaints', riskScore:48, initials:'HQ' },
+  ];
+  const riskColor = s => s>=80?C.red:s>=60?C.amber:C.green;
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+      <div style={{
+        padding:'14px 18px', background:C.amberGlow, border:`1px solid ${C.amber}44`, borderRadius:12,
+        display:'flex', alignItems:'center', gap:12,
+      }}>
+        <span style={{ fontSize:20 }}>⊘</span>
+        <div>
+          <div style={{ fontSize:13, fontWeight:700, color:C.amber }}>5 Users Flagged by AI Behavior Tracking</div>
+          <div style={{ fontSize:11, color:C.textDim }}>Repeated fake or invalid complaint patterns detected</div>
+        </div>
+      </div>
+      <div style={{ display:'flex', gap:16 }}>
+        {[
+          { label:'Total Flagged', value:'5', color:C.amber },
+          { label:'Warnings Issued', value:warned.length.toString(), color:C.primary },
+          { label:'Accounts Banned', value:banned.length.toString(), color:C.red },
+          { label:'Fake Rate (system)', value:'6.2%', color:C.teal },
+        ].map((s,i)=>(
+          <Card key={i} style={{ flex:1, padding:'14px 18px' }}>
+            <div style={{ fontSize:11, color:C.textMuted, fontWeight:600, textTransform:'uppercase', letterSpacing:0.8 }}>{s.label}</div>
+            <div style={{ fontSize:28, fontWeight:800, color:s.color, marginTop:4 }}>{s.value}</div>
+          </Card>
+        ))}
+      </div>
+      <Card>
+        <div style={{ fontSize:14, fontWeight:700, color:C.text, marginBottom:14 }}>Flagged Users</div>
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {flagged.map((u,i)=>{
+            const isWarned = warned.includes(i);
+            const isBanned = banned.includes(i);
+            return (
+              <div key={i} style={{
+                padding:'16px', borderRadius:14, background:C.surfaceHigh,
+                border:`1px solid ${isBanned?C.red+'44':isWarned?C.amber+'33':C.border}`,
+                opacity: isBanned ? 0.7 : 1,
+              }}>
+                <div style={{ display:'flex', alignItems:'flex-start', gap:14 }}>
+                  <div style={{
+                    width:44, height:44, borderRadius:12,
+                    background:riskColor(u.riskScore)+'22', color:riskColor(u.riskScore),
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontSize:13, fontWeight:700, flexShrink:0,
+                  }}>{u.initials}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                      <div>
+                        <span style={{ fontSize:14, fontWeight:700, color:C.text }}>{u.name}</span>
+                        <span style={{ fontSize:11, color:C.textMuted, marginLeft:8 }}>{u.block} · {u.unit}</span>
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        {isBanned && <Badge color={C.red}>Banned</Badge>}
+                        {isWarned && !isBanned && <Badge color={C.amber}>Warned</Badge>}
+                        <div style={{
+                          padding:'4px 12px', borderRadius:20, fontSize:11, fontWeight:800,
+                          background:riskColor(u.riskScore)+'22', color:riskColor(u.riskScore),
+                          border:`1px solid ${riskColor(u.riskScore)}44`,
+                        }}>Risk {u.riskScore}%</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize:11, color:C.textMuted, marginBottom:6 }}>
+                      <span style={{ color:C.red, fontWeight:700 }}>{u.fakeCount} fake</span> / {u.totalComplaints} total complaints
+                    </div>
+                    <div style={{ fontSize:11, color:C.textDim, lineHeight:1.5, marginBottom:10,
+                      padding:'6px 10px', background:C.bg, borderRadius:8,
+                    }}>⊘ {u.pattern}</div>
+                    {!isBanned && (
+                      <div style={{ display:'flex', gap:8 }}>
+                        {!isWarned ? (
+                          <button onClick={()=>setWarned(w=>[...w,i])} style={{
+                            padding:'6px 14px', borderRadius:8, border:`1px solid ${C.amber}44`,
+                            background:C.amberGlow, color:C.amber,
+                            fontFamily:'Outfit', fontSize:12, fontWeight:600, cursor:'pointer',
+                          }}>Issue Warning</button>
+                        ) : (
+                          <button style={{
+                            padding:'6px 14px', borderRadius:8, border:`1px solid ${C.amber}44`,
+                            background:C.amberGlow, color:C.amber,
+                            fontFamily:'Outfit', fontSize:12, fontWeight:600, cursor:'default', opacity:0.7,
+                          }}>Warning Sent ✓</button>
+                        )}
+                        <button onClick={()=>setBanned(b=>[...b,i])} style={{
+                          padding:'6px 14px', borderRadius:8, border:`1px solid ${C.red}44`,
+                          background:C.redGlow, color:C.red,
+                          fontFamily:'Outfit', fontSize:12, fontWeight:600, cursor:'pointer',
+                        }}>Suspend Account</button>
+                        <button style={{
+                          padding:'6px 14px', borderRadius:8, border:`1px solid ${C.border}`,
+                          background:'transparent', color:C.textMuted,
+                          fontFamily:'Outfit', fontSize:12, cursor:'pointer',
+                        }}>View Complaints</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+// ─── Main App ─────────────────────────────────────────────────
+const App = () => {
+  const [active, setActive] = useState(() => localStorage.getItem('admin_tab') || 'overview');
+  const [tweaksOpen, setTweaksOpen] = useState(false);
+
+  useEffect(() => { localStorage.setItem('admin_tab', active); }, [active]);
+
+  // Tweaks
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{"accentColor":"#6366f1","darkMode":true}/*EDITMODE-END*/;
+  useEffect(() => {
+    window.addEventListener('message', e => {
+      if (e.data?.type === '__activate_edit_mode') setTweaksOpen(true);
+      if (e.data?.type === '__deactivate_edit_mode') setTweaksOpen(false);
+    });
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+  }, []);
+
+  const PAGE_TITLES = { overview:'Overview', complaints:'Complaints', analytics:'Analytics', map:'Hotspot Map', alerts:'Urgent Alerts', feedback:'Resident Feedback', sentiment:'Sentiment Analysis', fakedetect:'Fake Complaint Detection', users:'User Management', reports:'Reports' };
+
+  const renderPage = () => {
+    switch(active) {
+      case 'overview': return <OverviewPage/>;
+      case 'complaints': return <OverviewPage/>;
+      case 'analytics': return <AnalyticsPage/>;
+      case 'map': return <MapPage/>;
+      case 'alerts': return <AlertsPage/>;
+      case 'feedback': return <FeedbackPage/>;
+      case 'sentiment': return <SentimentPage/>;
+      case 'fakedetect': return <FakeDetectionPage/>;
+      case 'users': return <UsersPage/>;
+      case 'reports': return <ReportsPage/>;
+      default: return <OverviewPage/>;
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      <Sidebar active={active} setActive={setActive}/>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{
+          height: 60, borderBottom: `1px solid ${C.border}`,
+          display: 'flex', alignItems: 'center', padding: '0 24px',
+          justifyContent: 'space-between', background: C.surface, flexShrink: 0,
+        }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{PAGE_TITLES[active]}</div>
+            <div style={{ fontSize: 11, color: C.textMuted }}>Green Acres Housing Society · Lahore</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              padding: '6px 14px', borderRadius: 20, fontSize: 11,
+              background: C.greenGlow, color: C.green, fontWeight: 600,
+              border: `1px solid ${C.green}44`,
+            }}>● System Online</div>
+            <div style={{
+              width: 36, height: 36, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #ef4444, #f59e0b)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 12, fontWeight: 700, color: '#fff', position: 'relative',
+            }}>
+              3
+              <div style={{
+                position: 'absolute', top: -2, right: -2, width: 10, height: 10,
+                borderRadius: '50%', background: C.red, border: `2px solid ${C.surface}`,
+              }}/>
+            </div>
+          </div>
+        </div>
+        {/* Content */}
+        <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
+          {renderPage()}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
